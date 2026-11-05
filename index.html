@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#075bbd">
+<title>ARMAK MESSENGER</title>
+<style>
+:root{--blue:#0878e8;--deep:#064da9;--pale:#eaf4ff;--ink:#16243a;--muted:#73839b;--line:#e5edf7}
+*{box-sizing:border-box}body{margin:0;background:#edf3fb;color:var(--ink);font-family:Tahoma,Arial,sans-serif}
+.app{max-width:650px;height:100dvh;min-height:520px;margin:auto;background:#fff;display:flex;flex-direction:column;box-shadow:0 0 28px #173b6515}
+header{background:linear-gradient(120deg,var(--blue),var(--deep));color:#fff;padding:18px 16px 15px;box-shadow:0 3px 12px #063d801f}
+.brand{font-weight:800;direction:ltr;text-align:right;font-size:18px}.subtitle{font-size:12px;color:#d8eaff;margin-top:7px}
+.join{background:#f5f9ff;padding:12px;display:flex;gap:8px;border-bottom:1px solid var(--line)}
+input,button{font:inherit}input{min-width:0;border:1px solid #d8e5f5;border-radius:11px;padding:12px;outline-color:var(--blue)}
+.join input{flex:1}.btn{background:var(--blue);color:#fff;border:0;border-radius:11px;padding:11px 15px;font-weight:bold}
+.roominfo{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+.messages{flex:1;overflow:auto;padding:16px 12px;background-color:#edf5ff;background-image:radial-gradient(#cfe4ff 1px,transparent 1px);background-size:18px 18px}
+.notice{text-align:center;background:#dcecff;color:#426488;border-radius:12px;padding:10px;margin:0 auto 14px;max-width:95%;font-size:12px;line-height:1.7}
+.msg{background:#fff;padding:10px 12px;margin:8px 0;border-radius:14px 14px 14px 4px;max-width:88%;width:max-content;box-shadow:0 2px 5px #23486c0c;overflow-wrap:anywhere;line-height:1.7}
+.msg .name{font-size:11px;font-weight:bold;color:var(--blue);margin-bottom:4px}.msg .time{font-size:9px;color:var(--muted);margin-top:4px;text-align:left;direction:ltr}
+.msg.mine{background:#d9f8cf;margin-right:auto;border-radius:14px 14px 4px 14px}.system{text-align:center;font-size:11px;color:#7287a0;padding:7px}
+.composer{display:flex;gap:8px;padding:11px;border-top:1px solid var(--line);background:#fff}.composer input{flex:1}
+.footer{font-size:10px;color:#8291a5;text-align:center;padding:8px;background:#fff}
+@media(min-width:651px){body{padding:20px 0}.app{height:calc(100dvh - 40px);border-radius:20px;overflow:hidden}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="brand">ARMAK MESSENGER</div><div class="subtitle">پیام‌رسان آرماک · گفت‌وگوی زنده آزمایشی</div></header>
+<form class="join" id="joinForm">
+<input id="name" maxlength="24" placeholder="اسم نمایشی تو" aria-label="اسم نمایشی">
+<input id="room" maxlength="40" value="عمومی" placeholder="اتاق" aria-label="نام اتاق" style="max-width:115px">
+<button class="btn" type="submit">ورود</button>
+</form>
+<div class="roominfo"><span id="roomLabel">اتاق: عمومی</span><span id="online">۰ نفر آنلاین</span></div>
+<main class="messages" id="messages" aria-live="polite"><div class="notice">برای شروع، اسم نمایشی‌ات را بنویس و روی «ورود» بزن. برای آزمایش چت زنده، صفحه را در دو تب باز کن.</div></main>
+<form class="composer" id="sendForm"><input id="text" maxlength="2000" placeholder="پیام خود را بنویس..." autocomplete="off" aria-label="متن پیام"><button class="btn" type="submit">ارسال ➤</button></form>
+<div class="footer">نسخه آزمایشی · از ارسال اطلاعات خصوصی خودداری کن.</div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+ const socket = io();
+ const $ = id => document.getElementById(id);
+ const messages = $('messages');
+ let joined = false, myName = '';
+ const faTime = value => new Date(value).toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'});
+ function addSystem(text){const el=document.createElement('div');el.className='system';el.textContent=text;messages.appendChild(el);messages.scrollTop=messages.scrollHeight;}
+ function addMessage(m){
+   const el=document.createElement('div');el.className='msg'+(m.name===myName?' mine':'');
+   const name=document.createElement('div');name.className='name';name.textContent=m.name;
+   const body=document.createElement('div');body.textContent=m.text;
+   const time=document.createElement('div');time.className='time';time.textContent=faTime(m.time);
+   el.append(name,body,time);messages.appendChild(el);messages.scrollTop=messages.scrollHeight;
+ }
+ $('joinForm').addEventListener('submit',e=>{
+   e.preventDefault();myName=$('name').value.trim()||'کاربر آرماک';
+   const room=$('room').value.trim()||'عمومی';
+   socket.emit('user:join',{name:myName,room},result=>{
+     if(!result?.ok)return;
+     joined=true;$('roomLabel').textContent='اتاق: '+result.room;
+     messages.replaceChildren();addSystem('وارد اتاق «'+result.room+'» شدی.');
+     $('text').focus();
+   });
+ });
+ $('sendForm').addEventListener('submit',e=>{
+   e.preventDefault();const text=$('text').value.trim();if(!text)return;
+   if(!joined){addSystem('اول اسم و اتاق را وارد کن و روی «ورود» بزن.');return;}
+   socket.emit('chat:send',{text},result=>{if(!result?.ok)addSystem(result.error||'ارسال پیام ناموفق بود.');});
+   $('text').value='';$('text').focus();
+ });
+ socket.on('server:notice',data=>{if(data?.message)addSystem(data.message);});
+ socket.on('chat:history',history=>{(history||[]).forEach(addMessage);});
+ socket.on('chat:message',addMessage);
+ socket.on('chat:system',data=>{if(data?.text)addSystem(data.text);});
+ socket.on('room:users',list=>{$('online').textContent=(list||[]).length.toLocaleString('fa-IR')+' نفر آنلاین';});
+ socket.on('connect_error',()=>addSystem('اتصال به سرور برقرار نشد. مطمئن شو سرور اجراست و صفحه را دوباره بارگذاری کن.'));
+})();
+</script>
+</body>
+</html>
